@@ -52,7 +52,7 @@ int shark_send (shark *sh, char * data, int size);
    (255-широкоформатный), buffsize - размер буфера приемо-передачи, 
    rcv-указатель на функцию обработчик принятых данных */
 
-shark *shark_init (int portsnd, int portrcv, int ip, shark_receive rcv);
+shark *shark_init (int portsnd, int portrcv, char *ip, shark_receive rcv);
 
 /* -------------------------------------------------------------------------------------------- */
 /* Прочитать из сокета шарка в буфер буфер шарка очередную дейтаграмму. Возвращает количество 

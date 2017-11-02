@@ -18,6 +18,8 @@
 #include "shark.h"
 #include "system.h"
 
+#define LOCAL_HOST "127.0.0.1"
+
 int shark_local_addr = 0;
 
 /* -------------------------------------------------------------------------------------------- */
@@ -96,9 +98,6 @@ int shark_udp_client(char *hname, short port, struct sockaddr_in *sap)
 
 void *shark_server(void * arg)
 {
-    int tmp;
-    pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, &tmp);
-    pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, &tmp);
     shark *sh=(shark *)arg;
     int s, len;
     socklen_t sa_size;
@@ -198,7 +197,7 @@ char *shark_read (shark *sh,int *addr,int *count)
    с помощью функции shark_read. Если rcv задан, то чтение идет в отдельной нити. Пользователю
    по коллбэку приходят дейтаграммы  */
 
-shark *shark_init (int portsnd,int portrcv,int ip,shark_receive rcv)
+shark *shark_init (int portsnd,int portrcv,char *ip,shark_receive rcv)
 {
     /* Выделяем память под возвращаемую структуру */
     shark *ret=calloc (1,sizeof (shark));
@@ -207,15 +206,16 @@ shark *shark_init (int portsnd,int portrcv,int ip,shark_receive rcv)
     ret->portrcv=portrcv;
     ret->rcv=rcv;
     /* По-умолчанию считаем, что передаем только на себя (локалхост) */
-    char ips[32]="127.0.0.1";
+    //char ips[32]="127.0.0.1";
 
     /* Формируем ай-пи передатчика */
-    if (ip) sprintf (ips,"192.9.2.%d",ip);
+    if (!ip) ip = LOCAL_HOST;//sprintf (ips,"192.9.2.%d",ip);
     /* Открываем сокет для передачи */
-    ret->socksend = shark_udp_client (ips, portsnd, &ret->addr);
+    ret->socksend = shark_udp_client (ip, portsnd, &ret->addr);
     /* Если адрес широкоформатный нужно установить у сокета атрибут */
     int on=1;
-    if (ip==255) setsockopt(ret->socksend, SOL_SOCKET, SO_BROADCAST,(char*)&on,sizeof(int));
+    int s = atoi(strchr(ip, '.'));
+    if (s==255) setsockopt(ret->socksend, SOL_SOCKET, SO_BROADCAST,(char*)&on,sizeof(int));
     /* Запускаем нить чтения из порта, если задан режим с коллбэком*/
     if (rcv){
         ret->srv = 1;
@@ -223,8 +223,6 @@ shark *shark_init (int portsnd,int portrcv,int ip,shark_receive rcv)
         pthread_attr_t attr;
         struct sched_param param;
         pthread_attr_init(&attr);
-        //pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
-        //pthread_attr_setinheritsched(&attr, PTHREAD_EXPLICIT_SCHED);
         pthread_attr_setschedpolicy(&attr, SCHED_OTHER);
         pthread_attr_getschedparam(&attr, &param);
         param.sched_priority = 100;
@@ -271,16 +269,6 @@ int shark_send_all(shark *sh, char *data, int size){
             printf("shark_send_all error: try send %d, ret val %d", sd, ret);
             return size_send;
         }
-//        recv_buf = shark_read(sh, 0, &ret);
-//        if(ret < (int)sizeof(int)){
-//            printf("shark_send_all error: try recv ancer\n");
-//            return size_send;
-//        }
-//        memcpy(&ret, recv_buf, sizeof(int));
-//        if(ret != RECEIVE_OK){
-//            printf("shark_send_all error: server receive bad buffer\n");
-//            return size_send;
-//        }
         size_send += sd;
     }
     return size_send;
