@@ -53,7 +53,6 @@ typedef struct RCClient{
     int step;
     float mouse_x, mouse_y;
     char serv_active;
-    int asx, asy;
     char *hname;
 
     int serv_addr;
@@ -69,15 +68,15 @@ RCClient client = {0};
 
 void RCClient_SetVisualInfo();
 void RCCLient_MainCicle();
-void RCClient_Receive(int addr, char *buf, int size);
+void RCClient_Receive(int addr, char *buf, int size, char *s_addr);
 void RCClient_ScaleImage(int oldw, int oldh, int neww, int newh, char *src, char *dst, int n);
 void RCClient_CompressImage(char *dst, unsigned long dst_size, char *src, unsigned long *src_size);
 void RCClient_SendScreen(shark *sh, int width, int height);
-void RCClient_SetEvent(int addr, char *buf, int size);
+void RCClient_SetEvent(int addr, char *buf, int size, char *s_addr);
 void *RCClient_SendThread(void *arg);
 void *RCClient_SendImageThread(void *arg);
 int RCClient_ScaleImage1(int width, int height, int nwidth, int nheight, char *src, char *dst, int n);
-//int RCClient_ScaleImage2(int width, int height, int nwidth, int nheight, char *src, char *dst, int n);
+int RCClient_ScaleImage2(int width, int height, int nwidth, int nheight, char *src, char *dst, int n);
 
 void RCClient_CreateMousePressEvent(int x, int y, int btn);
 void RCClient_CreateMouseMoveEvent(int x, int y);
@@ -85,26 +84,7 @@ void RCClient_CreateMouseReleaseEvent(int x, int y, int btn);
 void RCClient_CreateKeyPressEvent(KeySym ksym);
 void RCClient_CreateKeyReleaseEvent(KeySym ksym);
 
-void RCClient_RleCompress2(char *old, char *src, int src_size, char *dst, int *dst_size, int n, int lx){
-    int i, s;
-    //unsigned int tmp1, tmp2;
-    //tmp1 = tmp2 = 0;
-    //lx = (lx>>1);
-    for(i = 0, s = 0; i < src_size; i+=lx){
-        if(memcmp(&src[i], &old[i], lx) != 0){
-            dst[s++] = 1;
-            memcpy(&dst[s], &src[i], lx);
-            s+=lx;
-        }
-        else{
-            dst[s++] = 0;
-        }
-        if(s > src_size) return;
-    }
-    *dst_size = s;
-}
-
-void RCClient_RleCompress3(char *old, char *src, int src_size, char *dst, int *dst_size, int n){
+void RCClient_RleCompress(char *old, char *src, int src_size, char *dst, int *dst_size, int n){
     int i, s = 0;
     unsigned char sym_count = 0;
     unsigned int cur, next, ol;
@@ -310,139 +290,7 @@ void RCClient_RleCompress3(char *old, char *src, int src_size, char *dst, int *d
     *dst_size = s;
 }
 
-void RCClient_RleCompress1(char *old, char *src, int src_size, char *dst, int *dst_size, int n){
-    int i, j, f, t, s = 0;
-    int sym_count = 0;
-    char max_char = 127;
-    unsigned int cur, next, ol;
-    unsigned int cm = 0x80000000;
-    //int ss_count = 0;
-    size_t step = n;
-    *dst_size = 0;
-    if(src_size < 1) return;
-
-    memcpy(&cur, src, step);
-    if(old != NULL) memcpy(&ol, old, step);
-    for(i = step; i < src_size;){
-        sym_count = 0;
-        if(old == NULL || cur != ol){
-            do{
-                sym_count++;
-                memcpy(&next, &src[i], step);
-                i+=step;
-            }while(i < src_size && next == cur);
-            if(sym_count > max_char){
-                j = sym_count/max_char;
-                f = sym_count%max_char;
-                //j+=f;
-                for(t = 0; t < j; t++){
-                    dst[s++] = max_char;
-                    memcpy(&dst[s], &cur, step);
-                    s+=step;
-                }
-                if(f > 0){
-                    dst[s++] = (char)f;
-                    memcpy(&dst[s], &cur, step);
-                    s+=step;
-                }
-            }
-            else{
-                dst[s++] = (char)sym_count;
-                memcpy(&dst[s], &cur, step);
-                s+=step;
-            }
-            if(old != NULL) memcpy(&ol, &old[i-step], step);
-        }
-        else{
-            do{
-                sym_count++;
-                memcpy(&next, &src[i], step);
-                memcpy(&ol, &old[i], step);
-                i+=step;
-            }while(i < src_size && next == ol);
-            if(sym_count > max_char){
-                j = sym_count/max_char;
-                f = sym_count%max_char;
-                for(t = 0; t < j; t++){
-                    dst[s++] = max_char;
-                    memcpy(&dst[s], &cm, step);
-                    s+=step;
-                }
-                if(f > 0){
-                    dst[s++] = (char)f;
-                    memcpy(&dst[s], &cm, step);
-                    s+=step;
-                }
-            }
-            else{
-                dst[s++] = (char)sym_count;
-                memcpy(&dst[s], &cm, step);
-                s+=step;
-            }
-        }
-        cur = next;
-        if(s >= src_size){
-            return;
-        }
-    }
-    //printf("SS count - %d\n", ss_count);
-    *dst_size = s;
-}
-
-void RCClient_RleCompress(char *src, int src_size, char *dst, int *dst_size){
-    int i, s = 0;
-    //int j, f, n;
-    int sym_count = 0;
-    unsigned int cur, next;
-    //char max_char = 127;
-    size_t step = sizeof(unsigned int);
-    *dst_size = 0;
-    if(src_size < 0) return;
-    memcpy(&cur, src, sizeof(int));
-    for(i = step; i < src_size;){
-        sym_count = 0;
-        do{
-            sym_count++;
-            memcpy(&next, &src[i], step);
-            i+=step;
-        }while(i < src_size && next == cur);
-        //if(sym_count > max_char){
-        //j = sym_count/max_char;
-        //f = sym_count%max_char;
-        //            j+=f;
-        memcpy(&dst[s], &sym_count, step);
-        s+=step;
-        memcpy(&dst[s], &cur, step);
-        s+=step;
-        //            for(n = 0; n < j; n++){
-        //                dst[s++] = max_char;
-        //                memcpy(&dst[s], &cur, step);
-        //                s+=step;
-        //            }
-        //            if(f > 0){
-        //                dst[s++] = (char)f;
-        //                memcpy(&dst[s], &cur, step);
-        //                s+=step;
-        //            }
-        //        }
-        //        else{
-        //            dst[s++] = (char)sym_count;
-        //            memcpy(&dst[s], &cur, step);
-        //            s+=step;
-        //        }
-        if(s >= src_size) {
-            return;
-        }
-        cur = next;
-    }
-    *dst_size = s;
-}
-
 void RCClient_GetColormap(){
-    //Color_SetDepth(attr.depth, client.d);
-    //if(attr.depth != 8) return;
-    //char buf[SHARK_BUFFSIZE] = {0};
-    //unsigned short cm[256][3];// = {0};
     XColor col;
     short cm[256][3];// = {0};
     Colormap colm = XDefaultColormap(client.d, XDefaultScreen(client.d));
@@ -458,21 +306,12 @@ void RCClient_GetColormap(){
         client.cur_cm[i][1] = cm[i][1]>>8;
         client.cur_cm[i][2] = cm[i][2]>>8;
     }
-    /*if(memcmp(cm, client.cm, sizeof(client.cm)) != 0){
-        memcpy(client.cm, cm, sizeof(client.cm));
-        return 1;
-    }
-    else{
-        return 0;
-    }*/
     pthread_mutex_lock(&client.mutex);
     if(memcmp(cm, client.cm, sizeof(client.cm)) != 0){
         memcpy(client.cm, cm, sizeof(client.cm));
         client.map_change = 1;
     }
     pthread_mutex_unlock(&client.mutex);
-    //return &cm;
-    //memcpy(client.cm, cm, sizeof(cm));
 }
 
 void RCClient_SetVisualInfo(){
@@ -484,6 +323,7 @@ void RCClient_SetVisualInfo(){
     }
 #endif
     XWindowAttributes attr;
+    int i;
     client.svi.screen_height = 0;
     client.svi.screen_width = 0;
     client.d = XOpenDisplay(NULL);
@@ -492,22 +332,6 @@ void RCClient_SetVisualInfo(){
     client.vi.depth = attr.depth;
     client.vi.screen_height = attr.height;
     client.vi.screen_width = attr.width;
-    printf("Screen width - %d, screen height - %d\n", client.vi.screen_width, client.vi.screen_height);
-    double res = (double)client.vi.screen_width/(double)client.vi.screen_height;
-    char ok = 0;
-    int i, j;
-    for(i = 1; i < 30; i++){
-        for(j = 1; j < 30; j++){
-            if((double)i/(double)j == res){
-                ok = 1;
-                break;
-            }
-        }
-        if(ok) break;
-    }
-    client.asx = i;
-    client.asy = j;
-    printf("Aspect ratio is %d:%d\n", client.asx, client.asy);
     client.mouse_x = client.mouse_y = 0;
     switch(client.vi.depth){
     case 24:
@@ -608,7 +432,7 @@ void *RCClient_MainThread(void *arg){
     RCClient_SetVisualInfo();
     pthread_mutex_init(&client.mutex, NULL);
     pthread_mutex_init(&client.ev_mutex, NULL);
-    client.sh = shark_init(SERVER_PORT, CLIENT_PORT, BROADCAST_ADDR, RCClient_Receive);
+    client.sh = shark_init(SERVER_PORT, CLIENT_PORT, shark_getLocalAddr(), RCClient_Receive);
 #if defined OC2K1x
     pthread_attr_t attr;
     struct sched_param param;
@@ -700,7 +524,7 @@ void RCClient_SendColormap(shark *sh){
     //memcpy(client.cm, cm, sizeof(cm));
 }
 
-void RCClient_Receive(int addr, char *buf, int size){
+void RCClient_Receive(int addr, char *buf, int size, char *s_addr){
     int com, tmp;
     ImageInfo imInfo;
     shark *sh;
@@ -712,9 +536,8 @@ void RCClient_Receive(int addr, char *buf, int size){
     switch(com){
     case C_GET_SCREEN:
         memcpy(&imInfo, &buf[sizeof(int)*2], sizeof(ImageInfo));
-        loc_addr = shark_getLocalAddr();
-        printf("Loc addr - %d\n", loc_addr);
-        sh = shark_init(SERVER_RECV_PORT+loc_addr, CLIENT_PORT_1+loc_addr, addr, NULL);
+        loc_addr = atoi(strrchr(shark_getLocalAddr(), '.') + 1);
+        sh = shark_init(SERVER_RECV_PORT+loc_addr, CLIENT_PORT_1+loc_addr, s_addr, NULL);
         RCClient_SendScreen(sh, imInfo.width, imInfo.height);
         //close(sh->sockrcv);
         //close(sh->socksend);
@@ -729,7 +552,7 @@ void RCClient_Receive(int addr, char *buf, int size){
         memcpy(&tmp, &buf[sizeof(int)*2], sizeof(int));
         client.state = STATE_ACTIVE;
         client.servaddr = addr;
-        client.ev_sh = shark_init(tmp, CLIENT_ACTIVE_PORT, addr, RCClient_SetEvent);
+        client.ev_sh = shark_init(tmp, CLIENT_ACTIVE_PORT, s_addr, RCClient_SetEvent);
 #if defined OC2K1x
         pthread_attr_t attr;
         struct sched_param param;
@@ -758,7 +581,7 @@ void RCClient_Receive(int addr, char *buf, int size){
         //shark_close(client.ev_sh);
         break;
     case C_GET_COLORMAP:
-        sh = shark_init(SERVER_RECV_PORT, CLIENT_PORT, addr, NULL);
+        sh = shark_init(SERVER_RECV_PORT, CLIENT_PORT, s_addr, NULL);
         RCClient_SendColormap(sh);
         //close(sh->sockrcv);
         //close(sh->socksend);
@@ -768,7 +591,7 @@ void RCClient_Receive(int addr, char *buf, int size){
     }
 }
 
-void RCClient_SetEvent(int addr, char *buf, int size){
+void RCClient_SetEvent(int addr, char *buf, int size, char *s_addr){
     int type;//, tm;
     MouseEvent *mev;
     KeyEvent *kev;
@@ -1009,7 +832,7 @@ void *RCClient_SendImageThread(void *arg){
             //if(oldBuf != NULL) RCClient_RleCompress2(oldBuf, imageBuf, (int)src_size, tmpBuf, &tmp, n, n * client_width);
             if(oldBuf != NULL) {
                 tt = time_get();
-                RCClient_RleCompress3(oldBuf, imageBuf, (int)src_size, tmpBuf, &tmp, n);
+                RCClient_RleCompress(oldBuf, imageBuf, (int)src_size, tmpBuf, &tmp, n);
                 //RCClient_RleCompress2(oldBuf, imageBuf, (int)src_size, tmpBuf, &tmp, n, n*client_width);
                 tt = time_get() - tt;
                 printf("Time to rle compress - %d\n", (int)tt);
@@ -1174,7 +997,7 @@ int RCClient_Scale24(int dx, int height, int dstdx, int nheight, char *src_loc, 
         memset (count,0,sizeof (count));
         /* Для глубины 8 бит */
         {
-            unsigned char *dstl=dst;
+            unsigned char *dstl=(unsigned char*)dst;
             int v = 0;
             // Используя массив, начинаем сжатие
             for (i=0;i<height;i++)
@@ -1274,7 +1097,7 @@ int RCClient_Scale8 (int dx,int height,int dstdx,int nheight,char *src,char *dst
         memset (count,0,sizeof (count));
         /* Для глубины 8 бит */
         {
-            unsigned char *dstl=dst;
+            unsigned char *dstl=(unsigned char*)dst;
             // Используя массив, начинаем сжатие
             for (i=0;i<height;i++)
             {
@@ -1782,8 +1605,8 @@ char *RCClient_GetVisualInfo(int *size){
     *size += sizeof(int);
     memcpy(&buf[*size], &client.vi, sizeof(VisualInfo));
     *size += sizeof(VisualInfo);
-    memcpy(&buf[*size], client.hname, sizeof(client.hname));
-    *size += sizeof(client.hname);
+    memcpy(&buf[*size], client.hname, strlen(client.hname));
+    *size += strlen(client.hname);
     return buf;
 }
 

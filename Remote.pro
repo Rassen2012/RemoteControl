@@ -4,7 +4,7 @@ CONFIG -= app_bundle
 CONFIG -= qt
 
 LIBS += -lX11 -lXpm -lpthread -lXtst
-DEFINES += SELF_COMPILE
+DEFINES += SELF_COMPILE LINUX_MINT
 
 SOURCES += \
     Logic/minilzo/minilzo.c \

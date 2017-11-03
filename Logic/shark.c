@@ -20,7 +20,8 @@
 
 #define LOCAL_HOST "127.0.0.1"
 
-int shark_local_addr = 0;
+char *shark_local_addr = NULL;
+char shark_broadcast_addr[50];
 
 /* -------------------------------------------------------------------------------------------- */
 /* Установка адреса */
@@ -132,7 +133,7 @@ void *shark_server(void * arg)
             if (len < 1) continue;
             //printf ("sin_addr[0]=%x\n",client_addr.sin_addr);
             sh->cl_addr = shark_getHostAddr(client_addr.sin_addr);
-            if (sh->rcv) sh->rcv (client_addr.sin_addr.s_addr>>24,buf,len);
+            if (sh->rcv) sh->rcv (client_addr.sin_addr.s_addr>>24,buf,len, shark_getHostAddr(client_addr.sin_addr));
 
             FD_CLR(s, &read_fds);
         }
@@ -214,8 +215,8 @@ shark *shark_init (int portsnd,int portrcv,char *ip,shark_receive rcv)
     ret->socksend = shark_udp_client (ip, portsnd, &ret->addr);
     /* Если адрес широкоформатный нужно установить у сокета атрибут */
     int on=1;
-    int s = atoi(strchr(ip, '.'));
-    if (s==255) setsockopt(ret->socksend, SOL_SOCKET, SO_BROADCAST,(char*)&on,sizeof(int));
+    int s = atoi(strrchr(ip, '.')+1);
+    if (s) setsockopt(ret->socksend, SOL_SOCKET, SO_BROADCAST,(char*)&on,sizeof(int));
     /* Запускаем нить чтения из порта, если задан режим с коллбэком*/
     if (rcv){
         ret->srv = 1;
@@ -314,12 +315,11 @@ char *shark_getHostAddr(struct in_addr s_addr){
     return inet_ntoa(s_addr);
 }
 
-int shark_getLocalAddr(){
-    if(shark_local_addr > 0) return shark_local_addr;
+char* shark_getLocalAddr(){
+    if(shark_local_addr) return shark_local_addr;
     struct ifaddrs *ifadds, *ifa;
-    int addr = 0;
     unsigned int localhost = (1<<24)|127;
-    if(getifaddrs(&ifadds) != 0) return addr;
+    if(getifaddrs(&ifadds) != 0) return NULL;
     struct sockaddr_in *sa;
     ifa = ifadds;
     do{
@@ -328,16 +328,26 @@ int shark_getLocalAddr(){
         sa = (struct sockaddr_in*)ifa->ifa_addr;
         if(sa->sin_addr.s_addr > 0){
             if((unsigned int)sa->sin_addr.s_addr == localhost) continue;
-            shark_local_addr = addr = sa->sin_addr.s_addr>>24;
+            shark_local_addr = shark_getHostAddr(sa->sin_addr);//addr = sa->sin_addr.s_addr>>24;
+
             break;
         }
     }while((ifa = ifa->ifa_next) != NULL);
 
     freeifaddrs(ifadds);
-    return addr;
+    return shark_local_addr;
 }
 
-#if 1
+char *shark_getBroadcastAddr(){
+    static int a = 0;
+    if(a) return shark_broadcast_addr;
+    if(!a) a=1;
+    memset(shark_broadcast_addr, 0, sizeof(shark_broadcast_addr));
+    int n = strrchr(shark_getLocalAddr(), '.') - shark_getLocalAddr();
+    strncpy(shark_broadcast_addr, shark_getLocalAddr(), n);
+    strcat(shark_broadcast_addr, ".255");
+    return shark_broadcast_addr;
+}
 
 /* -------------------------------------------------------------------------------------------- */
 
@@ -382,37 +392,5 @@ void shark_close(shark *sh){
     //printf("Shark close port send - %d, port recv - %d\n", ps, pr);
     sh = NULL;
 }
-
-#define WITH_THREAD
-
-//int main (int argc,char *argv[])
-//{
-//  if (argc<4)
-//  {
-//    printf ("usage %s <portsnd> <portrcv> <ip>  (255 for broadcast,0-for local host)\n",argv[0]);
-//    return 0;
-//  }
-//  shark *s=shark_init (atoi (argv[1]),atoi (argv[2]),atoi (argv[3]),
-//#ifdef WITH_THREAD
-//  rcv_from_shark);
-//#else
-//  NULL);
-//  pthread_t thr;
-//  pthread_create (&thr,NULL,shark_thread_poll,s);
-//#endif
-//  char buf[1024];
-//  while (1)
-//  {
-//    int ret;
-//    buf[0]=0;
-//    gets (buf);
-//    ret=shark_send (s,buf,strlen (buf)+1);
-//    printf ("send message len=%d ret=%d\n",strlen (buf)+1,ret);
-//  }
-//}
-
-/* -------------------------------------------------------------------------------------------- */
-
-#endif
 
 /* -------------------------------------------------------------------------------------------- */

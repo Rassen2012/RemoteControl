@@ -58,7 +58,7 @@ void ListView_Dispose(S_ListView *lv){
 void ListView_AddItem(S_ListView *lv, S_ListViewItem *item){
         lv->items = (S_ListViewItem**)realloc(lv->items, sizeof(S_ListViewItem*)*(lv->items_count+1));
         lv->items[lv->items_count++] = item;
-        Widget_Resize(lv->widget, lv->widget->width, lv->widget->height + item->widget->height);
+        if(lv->widget->height < lv->items_count * item->widget->height) Widget_Resize(lv->widget, lv->widget->width, lv->widget->height + item->widget->height);
         Widget_Move(item->widget, item->widget->x, (lv->items_count-1)*item->widget->height);
 //        if(lv->s->type == VERTICAL_SCROLL){
 //            Scroll_SetSwSize(lv->s, lv->widget->height);

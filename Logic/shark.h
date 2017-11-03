@@ -8,7 +8,7 @@
 #define SHARK_BUFFSIZE 4096//10000//65536
 /* Описание функции приема */
 
-typedef void (*shark_receive) (int addr,char *buf,int size);
+typedef void (*shark_receive) (int addr,char *buf,int size, char *s_addr);
 
 /* -------------------------------------------------------------------------------------------- */
 /* Сеть на юди-пи протоколе. С возможностью широковещательной посылки сообщений */
@@ -63,6 +63,7 @@ int shark_send_all(shark *sh, char *data, int size);
 int shark_recv_all(shark *sh, char *buf, int size);
 void shark_close(shark *sh);
 char *shark_getHostAddr(struct in_addr s_addr);
-int shark_getLocalAddr();
+char *shark_getLocalAddr();
+char *shark_getBroadcastAddr();
 
 #endif

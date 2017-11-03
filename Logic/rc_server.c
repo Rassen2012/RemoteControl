@@ -7,7 +7,6 @@
 #include <stdlib.h>
 #include <math.h>
 #include <unistd.h>
-//#include <X11/xpm.h>
 #include "public.h"
 #include "../Widgets/form.h"
 #include "../Widgets/panel.h"
@@ -26,8 +25,8 @@
 #include "rc_server_form.h"
 #include "rc_client.h"
 
-#define PANEL_WIDTH 256//200
-#define PANEL_HEIGHT 192//120
+#define PANEL_WIDTH 435//256//200
+#define PANEL_HEIGHT 250//192//120
 #define FORM_WIDTH PANEL_WIDTH*3+20*4//680
 #define FORM_HEIGHT PANEL_HEIGHT*3+20*4//480
 #define TITLE_HEIGHT 20
@@ -77,26 +76,27 @@ typedef struct RCServer{
     pthread_mutex_t mutex;
     pthread_mutex_t paint_mutex;
     VisualInfo vi;
-    int next_port;
     unsigned short cm[256][3];
     unsigned char s_pal[256][3];
     unsigned int *big_pal;
 
     EventQueue *qu;
-    unsigned char localAddr;
+    char *localAddr;
 }Server;
 
 Server server = {0};
+#include <malloc.h>
+//#include <X11/Xutil.h>
 
 void RCServer_PanelMousePress(Panel *p, MouseEventArgs *ev);
 
-void RCServer_Receive(int addr, char *buf, int size);
+void RCServer_Receive(int addr, char *buf, int size, char *s_addr);
 void RCServer_AddClient(int addr, VisualInfo *vi, char *s_addr, char *chname);
 void RCServer_RemoveClient(int id);
 void RCServer_PanelCreateImage(void *arg);
 void RCServer_CreateImage(int id, unsigned char *buf);
 void RCServer_SendGetSmallImage(int id);
-int RCServer_SendGetScreen(shark *sh, int width, int height, int id);
+int RCServer_SendGetScreen(shark *sh, int width, int height, int id, char *s_addr);
 void *RCServer_CheckClientsThread(void *arg);
 void RCServer_GetActiveClient(shark *sh);
 void RCServer_CloseActiveClient(int addr);
@@ -111,6 +111,31 @@ void RCServer_ButtonHover(int addr, int x);
 void RCServer_ButtonLeave(int addr);
 void RCServer_ButtonClick(int addr);
 void RCServer_HideButtonClick();
+
+void RCServer_ListItemSelect(void *sender, void *object){
+    ClientInfo *ci = (ClientInfo*)object;
+    pthread_mutex_lock(&server.mutex);
+    int i;
+    for(i = 0; i < server.client_count; i++){
+        server.ci[i]->preview = 0;
+    }
+    ci->preview = 1;
+    pthread_mutex_unlock(&server.mutex);
+}
+
+void RCServer_AddListViewItem(void *arg){
+    ClientInfo *ci = (ClientInfo*)arg;
+    char *name = calloc(strlen(ci->s_addr) + strlen(ci->chname) + 4, 1);
+    strcpy(name, ci->chname);
+    strcat(name, " (");
+    strcat(name, ci->s_addr);
+    strcat(name, ")");
+    S_ListViewItem *it = S_ListViewItem_newListViewItem(server.lv, name);
+    it->object = (void*)ci;
+    it->ItemSelect = RCServer_ListItemSelect;
+    Widget_Show(it->widget);
+    free(name);
+}
 
 void RCServer_GetVisualInfo(){
     XWindowAttributes attr;
@@ -278,7 +303,7 @@ void RCServer_SetPanelImage(void *arg){
     if(im) Panel_SetBackgroundImage(server.p, im);
 }
 
-int RCServer_SendGetScreen(shark *sh, int width, int height, int addr){
+int RCServer_SendGetScreen(shark *sh, int width, int height, int addr, char *s_addr){
     int size = sizeof(int)*2+sizeof(ImageInfo);
     int com = C_GET_SCREEN;
     unsigned long t, f;//, ttime;
@@ -295,7 +320,7 @@ int RCServer_SendGetScreen(shark *sh, int width, int height, int addr){
     memcpy(sndBuf, &size, sizeof(int));
     memcpy(&sndBuf[sizeof(int)], &com, sizeof(int));
     memcpy(&sndBuf[sizeof(int)*2], &imInfo, sizeof(ImageInfo));
-    sh = shark_init(CLIENT_PORT, SERVER_RECV_PORT+addr, addr, NULL);
+    sh = shark_init(CLIENT_PORT, SERVER_RECV_PORT+addr, s_addr, NULL);
     ret = shark_send(sh, sndBuf, size);
     //	printf("Begin recv screen!\n");
     if(ret < size){
@@ -305,7 +330,7 @@ int RCServer_SendGetScreen(shark *sh, int width, int height, int addr){
     }
     //int tmpAddr = sh->addr.sin_addr.s_addr>>24;
     shark_close(sh);
-    sh = shark_init(CLIENT_PORT_1+addr, SERVER_RECV_PORT+addr, addr, NULL);
+    sh = shark_init(CLIENT_PORT_1+addr, SERVER_RECV_PORT+addr, s_addr, NULL);
     //printf("Before read - %d\n", time_get() - ttime);
     //ttime = time_get();
     recvBuf = shark_read(sh, 0, &size);
@@ -450,10 +475,10 @@ void RCServer_Start(){
     server.localAddr = shark_getLocalAddr();
     server.ci = NULL;
     server.state = STATE_PASSIVE;
-    server.sh = shark_init(CLIENT_PORT, SERVER_PORT, BROADCAST_ADDR, RCServer_Receive);
+    server.sh = shark_init(CLIENT_PORT, SERVER_PORT, shark_getBroadcastAddr(), RCServer_Receive);
     server.client_count = 0;
     server.qu = NULL;
-    server.next_port = 50010;
+    //server.next_port = 50010;
     pthread_mutex_init(&server.mutex, NULL);
     pthread_mutex_init(&server.paint_mutex, NULL);
     RCServer_GetVisualInfo();
@@ -466,7 +491,7 @@ void RCServer_Start(){
     Form_SetSizePolicy(server.f, server.f->widget->width, server.f->widget->height, server.f->widget->width, server.f->widget->height);
     server.tl = TextLine_newTextLine(server.f->widget, 5, 5, 250, 22, "Введите ip...", 10);
     server.lv = ListView_newListView(server.f->widget, 5, 32, 250, 460);
-    server.p = Panel_newPanel(260, 5, 435, 250, server.f->widget);
+    server.p = Panel_newPanel(260, 5, PANEL_WIDTH, PANEL_HEIGHT, server.f->widget);
 
     Widget_SetTabIndex(server.tl->widget, 0);
     Widget_SetTabIndex(server.lv->widget, 1);
@@ -491,7 +516,7 @@ void RCServer_SendGetColormap(ClientInfo *ci){
     char buf[SHARK_BUFFSIZE] = {0};
     char *tmp;
     while(ci->addr == 0) thread_pause(10);
-    shark *sh = shark_init(CLIENT_PORT, SERVER_RECV_PORT, ci->addr, NULL);
+    shark *sh = shark_init(CLIENT_PORT, SERVER_RECV_PORT, ci->s_addr, NULL);
     int com = C_GET_COLORMAP;
     int size = sizeof(int)*2;
     memcpy(buf, &size, sizeof(int));
@@ -515,12 +540,12 @@ void RCServer_SendGetColormap(ClientInfo *ci){
     }
 }
 
-void RCServer_Receive(int addr, char *buf, int size){
+void RCServer_Receive(int addr, char *buf, int size, char *s_addr){
     int buf_size = 0;
     int com;
     int i;
     VisualInfo vi = {0};
-    if(addr == server.localAddr) return;
+    if(memcmp(s_addr, server.localAddr, strlen(server.localAddr)) == 0) return;
     //printf("Addr = %d, local addr - %d\n", addr, server.localAddr);
     if(size < (int)sizeof(int)){
         printf("Server receive to small datagram\n");
@@ -567,7 +592,10 @@ void RCServer_AddClient(int addr, VisualInfo *vi, char *s_addr, char *chname){
     server.ci = (ClientInfo**)realloc(server.ci, sizeof(ClientInfo*)*(server.client_count+1));
     server.ci[server.client_count] = ci;
     server.client_count++;
-
+    Event ev;
+    ev.func = RCServer_AddListViewItem;
+    ev.arg = (void*)ci;
+    Form_AddEvent(server.f, ev);
     pthread_t th;
 #if defined (OC2K1x)
     pthread_attr_t attr;
@@ -828,21 +856,6 @@ void RCServer_CalcWindowPos(int *x, int *y, int width, int height){
 
 }
 
-void RCServer_PanelMousePress(Panel *p, MouseEventArgs *ev){
-
-}
-
-void RCServer_GetActiveClient(shark *sh){
-    char buf[SHARK_BUFFSIZE] = {0};
-    int size = sizeof(int)*3;
-    int com = C_SET_ACTIVE_STATE;
-    int port = server.next_port;//50010;//sh->portsnd;
-    memcpy(buf, &size, sizeof(int));
-    memcpy(&buf[sizeof(int)], &com, sizeof(int));
-    memcpy(&buf[sizeof(int)*2], &port, sizeof(int));
-    shark_send(sh, buf, size);
-}
-
 void RCServer_SetPassiveClient(shark *sh){
     char buf[SHARK_BUFFSIZE] = {0};
     int size = sizeof(int)*2;
@@ -873,7 +886,7 @@ void *RCServer_CheckClientThread(void *arg){
     int a = 0;
     while(server.state != STATE_NONE){
             if(ci->preview){
-                if(RCServer_SendGetScreen(NULL, PANEL_WIDTH, PANEL_HEIGHT, ci->addr) < 0){
+                if(RCServer_SendGetScreen(NULL, PANEL_WIDTH, PANEL_HEIGHT, ci->addr, ci->s_addr) < 0){
                 if(++a > 4){
                     pthread_mutex_lock(&server.mutex);
                     RCServer_RemoveClient(ci->addr);

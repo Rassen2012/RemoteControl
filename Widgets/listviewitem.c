@@ -16,6 +16,7 @@ S_ListViewItem *S_ListViewItem_newListViewItem(S_ListView *parent, char *text){
     item->widget->type = WIDGET_TYPE_LISTVIEWITEM;
     item->widget->object = (void*)item;
     item->object = NULL;
+    item->sender = (void*)item;
     item->ItemSelect = NULL;
     item->widget->is_tabed = 0;
     Widget_SetBorderWidth(item->widget, 0);
@@ -37,6 +38,7 @@ S_ListViewItem *S_ListViewItem_newListViewItem(S_ListView *parent, char *text){
 
 void S_ListViewItem_Dispose(S_ListViewItem *item){
     item->widget->disposed = 1;
+    if(item->text) free(item->text);
     if(item->parent != NULL) Widget_RemoveChild(item->parent->widget, item->widget);
     free(item);
 }
