@@ -98,7 +98,7 @@ void RCServer_CreateImage(int id, unsigned char *buf);
 void RCServer_SendGetSmallImage(int id);
 int RCServer_SendGetScreen(shark *sh, int width, int height, int id, char *s_addr);
 void *RCServer_CheckClientsThread(void *arg);
-void RCServer_GetActiveClient(shark *sh);
+void RCServer_GetActiveClient(shark *sh, int port);
 void RCServer_CloseActiveClient(int addr);
 
 int GetAppPalete(unsigned char r, unsigned char g, unsigned char b);
@@ -111,6 +111,7 @@ void RCServer_ButtonHover(int addr, int x);
 void RCServer_ButtonLeave(int addr);
 void RCServer_ButtonClick(int addr);
 void RCServer_HideButtonClick();
+void RCServer_CalcWindowPos(int *x, int *y, int width, int height);
 
 void RCServer_ListItemSelect(void *sender, void *object){
     ClientInfo *ci = (ClientInfo*)object;
@@ -464,6 +465,35 @@ void RCServer_MakeBigPalette(){
     server.big_pal = (unsigned int*)malloc(sizeof(unsigned int)*BIG_PALETE_SIZE);
     for(i = 0; i < BIG_PALETE_SIZE; i++){
         server.big_pal[i] = GetAppPalete((i>>11)<<3,((i>>5)&0x3f)<<2, (i&0x1f)<<3);
+    }
+}
+
+void RCServer_PanelMousePress(Panel *p, MouseEventArgs *ev){
+    if(ev->button == MOUSE_BUTTON_LEFT){
+        int i;
+        shark *sh = NULL;
+        for(i = 0; i < server.client_count; i++){
+            if(server.ci[i]->preview){
+                if(!server.ci[i]->active){
+                    pthread_mutex_lock(&server.mutex);
+                    sh = shark_init(CLIENT_PORT, SERVER_RECV_PORT, server.ci[i]->s_addr, NULL);
+                    RCServer_GetActiveClient(sh, 51000 + server.ci[i]->addr);
+                    shark_close(sh);
+                    pthread_mutex_unlock(&server.mutex);
+                    server.ci[i]->sf = RCServerForm_newRCServerForm(server.ci[i]->addr, CLIENT_ACTIVE_PORT, 51000+server.ci[i]->addr, server.ci[i]->vi.depth, server.ci[i]->vi.screen_width,
+                                                                    server.ci[i]->vi.screen_height, server.ci[i]->cm, server.cm, server.ci[i]->s_addr, server.ci[i]->chname, server.ci[i]->s_addr);
+                    server.ci[i]->sf->Close = RCServer_CloseActiveClient;
+                    int x, y;
+                    x = y = 0;
+                    RCServer_CalcWindowPos(&x, &y, SF_WIDTH, SF_HEIGHT);
+                    RCServerForm_Start(server.ci[i]->sf, x, y, 0, 0);
+                    server.ci[i]->active = 1;
+                }
+                else{
+                    RCServerForm_Raise(server.ci[i]->sf);
+                }
+            }
+        }
     }
 }
 
@@ -853,7 +883,16 @@ void RCServer_CalcWindowPos(int *x, int *y, int width, int height){
         *x = *y = 0;
         break;
     }
+}
 
+void RCServer_GetActiveClient(shark *sh, int port){
+    char buf[SHARK_BUFFSIZE] = {0};
+    int size = sizeof(int)*3;
+    int com = C_SET_ACTIVE_STATE;
+    memcpy(buf, &size, sizeof(int));
+    memcpy(&buf[sizeof(int)], &com, sizeof(int));
+    memcpy(&buf[sizeof(int)*2], &port, sizeof(int));
+    shark_send(sh, buf, size);
 }
 
 void RCServer_SetPassiveClient(shark *sh){

@@ -25,6 +25,7 @@ typedef struct RCServerForm{
     int client_depth;
     int client_width;
     int client_height;
+    char *client_saddr;
     int tmp_width, tmp_height;
     unsigned short pal[256][3];
     unsigned short serv_pal[256][3];
@@ -70,7 +71,7 @@ typedef struct RCServerForm{
 }RCServerForm;
 
 RCServerForm *RCServerForm_newRCServerForm(int client_addr, int client_port, int server_port, int client_depth, int client_width, int client_height, unsigned short pal[][3],
-                                unsigned short serv_pal[][3], char *hostIp, char *chname);
+                                unsigned short serv_pal[][3], char *hostIp, char *chname, char *s_addr);
 void RCServerForm_Dispose(RCServerForm *sf);
 void RCServerForm_Start(RCServerForm *sf, int x, int y, int width, int height);
 void RCServerForm_Stop(RCServerForm *sf);

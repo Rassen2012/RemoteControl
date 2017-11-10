@@ -746,7 +746,7 @@ void MakeBigPalete(RCServerForm *sf){
 }
 
 RCServerForm *RCServerForm_newRCServerForm(int client_addr, int client_port, int server_port, int client_depth, int client_width, int client_height,
-                                           unsigned short pal[][3], unsigned short serv_pal[][3], char *hostIp, char *chname){
+                                           unsigned short pal[][3], unsigned short serv_pal[][3], char *hostIp, char *chname, char *s_addr){
     RCServerForm *sf = (RCServerForm*)malloc(sizeof(RCServerForm));
     if(sf == NULL) return NULL;
     sf->client_addr = client_addr;
@@ -755,6 +755,7 @@ RCServerForm *RCServerForm_newRCServerForm(int client_addr, int client_port, int
     sf->client_depth = client_depth;
     sf->client_width = client_width;
     sf->client_height = client_height;
+    sf->client_saddr = s_addr;
     sf->isFullWindow = 0;
     sf->imageData = NULL;
     sf->fullwidth = sf->fullheight = sf->x = sf->y;
@@ -823,7 +824,7 @@ void RCServerForm_Dispose(RCServerForm *sf){
 }
 
 void RCServerForm_Start(RCServerForm *sf, int x, int y, int width, int height){
-    sf->sh = shark_init(sf->client_port, sf->server_port, sf->client_addr, NULL);
+    sf->sh = shark_init(sf->client_port, sf->server_port, sf->client_saddr, NULL);
     if(sf->sh == NULL) return;
     thread_pause(100);
     sf->active = 1;
