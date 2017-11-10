@@ -508,10 +508,10 @@ void Widget_KeyPressEvent(S_Widget *w, KeyEventArgs *ev){
         Widget_KeyPressEvent(w->childs[i], ev);
         if(!ev->con) return;
     }
-    //if(w->window == ev->win){
+    if(w->window == ev->win){
         switch(w->type){
         case WIDGET_TYPE_FORM:
-            Form_KeyPress((Form*)w->object, ev);
+            //Form_KeyPress((Form*)w->object, ev);
             break;
         case WIDGET_TYPE_BUTTON:
             Button_KeyPress((Button*)w->object, ev);
@@ -531,7 +531,7 @@ void Widget_KeyPressEvent(S_Widget *w, KeyEventArgs *ev){
         default:
             break;
         }
-    //}
+    }
 }
 
 void Widget_KeyReleaseEvent(S_Widget *w, KeyEventArgs *ev){

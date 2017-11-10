@@ -253,7 +253,7 @@ Form *Form_newForm(int x, int y, int width, int height, int type, Form *parent){
     //f->widget->backgroundColor = FORM_BACGROUND_COLOR;
     //f->widget->foregroundColor = FORM_FOREGROUND_COLOR;
     XSelectInput(f->widget->display, f->widget->window, ExposureMask | PointerMotionMask | ButtonPressMask | ButtonReleaseMask | KeyPressMask | KeyReleaseMask |
-                 EnterWindowMask | LeaveWindowMask | SubstructureNotifyMask | StructureNotifyMask | FocusChangeMask);
+                 EnterWindowMask | LeaveWindowMask | SubstructureNotifyMask | SubstructureRedirectMask | StructureNotifyMask | FocusChangeMask);
 
     f->MouseMove = NULL;
     f->MouseRelease = NULL;
@@ -295,7 +295,7 @@ void Form_Hide(Form *f){
     Widget_Hide(f->widget);
 }
 
-void Form_SetTitle(Form *f, const char *title){
+void Form_SetTitle(Form *f, char *title){
     //memset(f->title, 0, sizeof(f->title));
     //strncpy(f->title, title, strlen(title));
     f->title = title;

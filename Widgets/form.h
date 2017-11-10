@@ -83,7 +83,7 @@ int Form_Y(Form *f);
 int Form_Width(Form *f);
 int Form_Height(Form *f);
 void Form_Paint(Form *f, PaintEventArgs *ev);
-void Form_SetTitle(Form *f, const char *title);
+void Form_SetTitle(Form *f, char *title);
 void Form_SetMinSize(Form *f, int min_width, int min_height);
 void Form_SetSizePolicy(Form *f, int min_width, int min_height, int max_width, int max_height);
 void Form_AddWidget(Form *f, S_Widget *child);

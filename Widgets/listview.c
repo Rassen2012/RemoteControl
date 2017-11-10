@@ -60,6 +60,7 @@ void ListView_AddItem(S_ListView *lv, S_ListViewItem *item){
         lv->items[lv->items_count++] = item;
         if(lv->widget->height < lv->items_count * item->widget->height) Widget_Resize(lv->widget, lv->widget->width, lv->widget->height + item->widget->height);
         Widget_Move(item->widget, item->widget->x, (lv->items_count-1)*item->widget->height);
+        ListView_Paint(lv, NULL);
 //        if(lv->s->type == VERTICAL_SCROLL){
 //            Scroll_SetSwSize(lv->s, lv->widget->height);
 //        }

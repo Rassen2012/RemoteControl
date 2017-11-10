@@ -522,6 +522,7 @@ void RCServer_Start(){
     server.tl = TextLine_newTextLine(server.f->widget, 5, 5, 250, 22, "Введите ip...", 10);
     server.lv = ListView_newListView(server.f->widget, 5, 32, 250, 460);
     server.p = Panel_newPanel(260, 5, PANEL_WIDTH, PANEL_HEIGHT, server.f->widget);
+    server.p->MousePress = RCServer_PanelMousePress;
 
     Widget_SetTabIndex(server.tl->widget, 0);
     Widget_SetTabIndex(server.lv->widget, 1);

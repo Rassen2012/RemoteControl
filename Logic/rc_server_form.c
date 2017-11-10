@@ -483,7 +483,7 @@ void RCServerForm_Paint(Form *f, PaintEventArgs *ev){
     //y+=sf->image_y;
     if((xt > 1000) && (abs(sf->client_mouse_x - x) > 5 || abs(sf->client_mouse_y - y) > 5)){
         //printf("Draw cursor! xt - %u xt>1000=%d, current_time = %u, move_time = %u\n", xt,xt>tmp_val, tmp_cur_time, tmp_move_time);
-        RCServerForm_DrawCursor(g, ev, sf->client_mouse_x, sf->client_mouse_y);
+        //RCServerForm_DrawCursor(g, ev, sf->client_mouse_x, sf->client_mouse_y);
     }
     if(sf->disconnected){
         Graphics_SetColor(g, Color_GetColor1(200, 200, 200, g->widget->display));
@@ -632,19 +632,9 @@ void KeyDown(Form *f, KeyEventArgs *ev){
     if((ev->keyChar == 'f' || ev->keyChar == 'Á') && ctrlPressed){
         if(f->mode == FULLSCREEN_MODE){
             Form_SetWindowMode(f, WINDOW_MODE);
-#if defined(OC2K1x)
-            //T_Event_Emit(D_TERM_EVENT_HEADLINE_HIDE, NULL, 0);
-            SS_Send0(PI_GetOurKto(), SS_GetID("D_HEADLINE_SHOW_SIGNAL"));
-            sf->titleVisible = 1;
-#endif
         }
         else{
             Form_SetWindowMode(f, FULLSCREEN_MODE);
-#if defined(OC2K1x)
-            //T_Event_Emit(D_TERM_EVENT_HEADLINE_HIDE, NULL, 1);
-            SS_Send0(PI_GetOurKto(), SS_GetID("D_HEADLINE_HIDE_SIGNAL"));
-            sf->titleVisible = 0;
-#endif
         }
     }
     else if(ctrlPressed && (ev->keyChar == 'a' || ev->keyChar == 'Æ')){
